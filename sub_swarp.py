@@ -166,9 +166,9 @@ if __name__ == "__main__":
                     "degrees. [Default is CRVAL1 from `image`].", type=float)
     ps.add_argument("-d", "--dec", dest="dec", help="DEC centre of subimage in "
                     "degrees. [Default is CRVAL2 from `image`].", type=float)
-    ps.add_argument("--pixels", dest="pixels", action="store_true",
+    ps.add_argument("--pixels", dest="unit", const="pixels", action="store_const",
                     help="Switch corresponding to `imsize` being specified "
-                    " in units of image pixels.")
+                    " in units of image pixels.", default="deg")
     ps.add_argument("-p", "--projection", dest="projection", help="Projection "
                     "for output image. See swarp documentation for options. "
                     "'native' will give the same projection as input image. "
@@ -177,10 +177,10 @@ if __name__ == "__main__":
 
     if len(args.outname) != len(args.image):
         args.outname = [None]*len(args.image)
-
+       
     for i, image in enumerate(args.image):
         subimage(image, args.imsize, args.outname[i], args.ra, args.dec,
-                 args.units, args.projection) 
+                 args.unit, args.projection) 
         print("Subimage of {0} made.".format(image))
     sys.exit(0)
 

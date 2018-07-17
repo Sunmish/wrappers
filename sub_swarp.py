@@ -132,7 +132,17 @@ def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg",
     cfg = config_file_formatter(outname, ra, dec, pscale, imsize, projection)
     s = "swarp {0} -c {1}".format(image, cfg)
     subprocess.call(s, shell=True)
+    
+    # Add beam and/or frequency key back:
+    with fits.open(outname, mode="update") as f:
+        if beam is not None:
+            f[0].header["BMAJ"] = beam[0]
+            f[0].header["BMIN"] = beam[1]
+            f[0].header["BPA"] = beam[2]
+        if freq is not None:
+            f[0].header["FREQ"] = freq
 
+        f.flush()
 
 
 # ---------------------------------------------------------------------------- #

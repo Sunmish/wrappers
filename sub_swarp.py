@@ -181,7 +181,7 @@ if __name__ == "__main__":
     for i, image in enumerate(args.image):
         subimage(image, args.imsize, args.outname[i], args.ra, args.dec,
                  args.units, args.projection) 
-    print("Subimage of {0} made.".format(args.image))
+        print("Subimage of {0} made.".format(image))
     sys.exit(0)
 
 

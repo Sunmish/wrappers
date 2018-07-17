@@ -106,8 +106,6 @@ def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg",
     if dec is None:
         dec = hdr["CRVAL2"]
 
-    print(ra, dec)
-
     if "d" in units.lower():
         imsize /= pscale
 
@@ -120,6 +118,7 @@ def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg",
         beam = (hdr["BMAJ"], hdr["BMIN"], hdr["BPA"])
 
     # Frequency data might not be preserved either:
+    freq = None
     if "FREQ" in hdr.keys():
         freq = hdr["FREQ"]
     elif "CRVAL3" in hdr.keys():
@@ -132,7 +131,7 @@ def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg",
     cfg = config_file_formatter(outname, ra, dec, pscale, imsize, projection)
     s = "swarp {0} -c {1}".format(image, cfg)
     subprocess.call(s, shell=True)
-    
+
     # Add beam and/or frequency key back:
     with fits.open(outname, mode="update") as f:
         if beam is not None:
@@ -145,33 +144,43 @@ def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg",
         f.flush()
 
 
+
 # ---------------------------------------------------------------------------- #
 if __name__ == "__main__":
 
     import argparse
-    ps = argparse.ArgumentParser(description="Create a subimage of a FITS file" 
-                                             " using SWARP.")
-    ps.add_argument(dest="image", 
-                    help="FITS image to create subimage from.")
-    ps.add_argument(dest="imsize", help="Size of image in "
-                    "either degrees [`units='deg'`] or pixels [`units='pixels'`].",
-                    type=float)
-    ps.add_argument("-o", "--outname", dest="outname", 
-                    help="Output file name [image_sub.fits]")
+    ps = argparse.ArgumentParser(description="Create a subimage of a FITS file " 
+                                             "using SWARP.",
+                                 epilog="If multiple images are given, either "
+                                        "multple outnames should also be given "
+                                        "otherwise outnames will follow the "
+                                        "default format.")
+    ps.add_argument("-i", "--image", dest="image", nargs="+",
+                    help="FITS image to create subimage from.", required=True)
+    ps.add_argument("-s", "--imsize", dest="imsize", help="Size of image in "
+                    "either degrees or pixels (with --pixels).",
+                    type=float, required=True)
+    ps.add_argument("-o", "--outname", dest="outname", nargs="+", 
+                    help="Output file name [image_sub.fits]", default=[None])
     ps.add_argument("-r", "--ra", dest="ra", help="RA centre of subimage in "
                     "degrees. [Default is CRVAL1 from `image`].", type=float)
     ps.add_argument("-d", "--dec", dest="dec", help="DEC centre of subimage in "
                     "degrees. [Default is CRVAL2 from `image`].", type=float)
-    ps.add_argument("-u", "--units", dest="units", help="Units of `imsize`. "
-                    "'deg' or 'pixels'. ['deg'].", default="deg")
+    ps.add_argument("--pixels", dest="pixels", action="store_true",
+                    help="Switch corresponding to `imsize` being specified "
+                    " in units of image pixels.")
     ps.add_argument("-p", "--projection", dest="projection", help="Projection "
                     "for output image. See swarp documentation for options. "
                     "'native' will give the same projection as input image. "
                     "['native'].", default="native")
     args = ps.parse_args()
 
-    subimage(args.image, args.imsize, args.outname, args.ra, args.dec,
-             args.units, args.projection) 
+    if len(args.outname) != len(args.image):
+        args.outname = [None]*len(args.image)
+
+    for i, image in enumerate(args.image):
+        subimage(image, args.imsize, args.outname[i], args.ra, args.dec,
+                 args.units, args.projection) 
     print("Subimage of {0} made.".format(args.image))
     sys.exit(0)
 

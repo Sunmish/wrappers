@@ -198,7 +198,7 @@ if __name__ == "__main__":
     ps = argparse.ArgumentParser(description="Create a subimage of a FITS file " 
                                              "using SWARP.",
                                  epilog="If multiple images are given, either "
-                                        "multple outnames should also be given "
+                                        "multiple outnames should also be given "
                                         "otherwise outnames will follow the "
                                         "default format.")
     ps.add_argument("-i", "--image", dest="image", nargs="+",

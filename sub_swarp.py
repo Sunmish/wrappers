@@ -2,7 +2,9 @@
 
 import os
 import sys
-import subprocess
+import uuid
+import shutil
+import subprocess32 as subprocess
 from astropy.io import fits
 
 
@@ -66,6 +68,13 @@ COMBINE_BUFSIZE        {6}             # RAM dedicated to co-addition(MB)
 
 
 
+def bpp(major, minor, cd1, cd2):
+    """Conversion from Jy/beam to Jy/pixel."""
+
+    return np.pi*(major*minor) / (cd1*cd2 * 4.*np.log(2.))
+
+
+
 def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg", 
              projection="native"):
     """Create subimage with swarp.
@@ -96,8 +105,10 @@ def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg",
     hdr = fits.getheader(image)
     if "CDELT1" in hdr.keys():
         pscale = abs(hdr["CDELT1"])
+        cd2 = abs(hdr["CDELT2"])
     elif "CD1_1" in hdr.keys():
         pscale = abs(hdr["CD1_1"])
+        cd2 = abs(hdr["CD2_2"])
     else:
         raise ValueError("No CDELT1 or CD1_1 found.")
 
@@ -116,6 +127,29 @@ def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg",
     beam = None
     if "BMAJ" in hdr.keys():
         beam = (hdr["BMAJ"], hdr["BMIN"], hdr["BPA"])
+    if beam is not None:
+        # We need to carefully preserve "Jy/beam" units by sripping them,
+        # then adding them back after making the subimage.
+        # This should only be necessary if the pixel scale changes, which it 
+        # shouldn't if only making a subimage like this.
+        # HOWEVER, I was caught out when resampling to different pixel scales,
+        # so this is here in case the resampling causes issues.
+        b = bpp(major=beam[0],
+                minor=beam[1],
+                cd1=pscale,
+                cd2=cd2)
+
+        # First generate a temporary file name:
+        tempf = str(uuid.uuid4())+".fits"
+        shutil.copy2(image, tempf)
+        # Then convert from Jy/beam to Jy/pixel:
+        with fits.open(tmpf, mode="update") as tf:
+            tf[0].data /= b
+            tf.flush()
+
+        sub_image = tempf
+    else:
+        sub_image = image
 
     # Frequency data might not be preserved either:
     freq = None
@@ -129,8 +163,9 @@ def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg",
 
     # Generate config. file:
     cfg = config_file_formatter(outname, ra, dec, pscale, imsize, projection)
-    s = "swarp {0} -c {1}".format(image, cfg)
+    s = "swarp {0} -c {1}".format(sub_image, cfg)
     subprocess.call(s, shell=True)
+
 
     # Add beam and/or frequency key back:
     with fits.open(outname, mode="update") as f:
@@ -138,10 +173,19 @@ def subimage(image, imsize, outname=None, ra=None, dec=None, units="deg",
             f[0].header["BMAJ"] = beam[0]
             f[0].header["BMIN"] = beam[1]
             f[0].header["BPA"] = beam[2]
+            b = bpp(major=beam[0],
+                    minor=beam[1],
+                    cd1=abs(f[0].header["CDELT1"]),
+                    cd2=abs(f[0].header["CDELT2"]))
+            f[0].data *= b
+
         if freq is not None:
             f[0].header["FREQ"] = freq
 
         f.flush()
+
+    if beam is not None:
+        os.remove(tempf)
 
 
 
@@ -177,7 +221,7 @@ if __name__ == "__main__":
 
     if len(args.outname) != len(args.image):
         args.outname = [None]*len(args.image)
-       
+    
     for i, image in enumerate(args.image):
         subimage(image, args.imsize, args.outname[i], args.ra, args.dec,
                  args.unit, args.projection) 
